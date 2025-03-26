@@ -1,9 +1,13 @@
 Virtual modem for ESP8266
 =========================
 
+Added HTTPS support - otherwise left everything how it was.
+Copyright (C) 2025 James Hudson <james@disconnectionist.com> under GPLv3 license.
+
+Based on https://github.com/RolandJuno/esp8266_modem
 Copyright (C) 2016 Paul Rickards <rickards@gmail.com> under GPLv3 license.
 
-based on https://github.com/jsalin/esp8266_modem
+Based on https://github.com/jsalin/esp8266_modem
 Copyright (C) 2015 Jussi Salin <salinjus@gmail.com> under GPLv3 license.
 
 Overview
