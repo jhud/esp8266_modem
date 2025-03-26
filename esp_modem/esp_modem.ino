@@ -28,6 +28,8 @@
 
 #include <ESP8266WiFi.h>
 #include <ESP8266WebServer.h>
+#include <ESP8266HTTPClient.h>
+#include <WiFiClientSecureBearSSL.h>
 #include <EEPROM.h>
 #include <ESP8266mDNS.h>
 
@@ -1206,60 +1208,113 @@ void command()
   /**** HTTP GET request ****/
   else if (upCmd.indexOf("ATGET") == 0)
   {
-    // From the URL, aquire required variables
-    // (12 = "ATGEThttp://")
-    int portIndex = cmd.indexOf(":", 12); // Index where port number might begin
-    int pathIndex = cmd.indexOf("/", 12); // Index first host name and possible port ends and path begins
-    int port;
-    String path, host;
-    if (pathIndex < 0)
-    {
-      pathIndex = cmd.length();
-    }
-    if (portIndex < 0)
-    {
-      port = 80;
-      portIndex = pathIndex;
-    }
-    else
-    {
-      port = cmd.substring(portIndex + 1, pathIndex).toInt();
-    }
-    host = cmd.substring(12, portIndex);
-    path = cmd.substring(pathIndex, cmd.length());
-    if (path == "") path = "/";
-    char *hostChr = new char[host.length() + 1];
-    host.toCharArray(hostChr, host.length() + 1);
+    const char protocolType = upCmd[9];
+    if (protocolType == 'S') {
+          /**** HTTPS GET request ****/
+      // From the URL, aquire required variables
+      const int addressIndex = 5; // start of URL in "ATGEThttps://"
+      
+      std::unique_ptr<BearSSL::WiFiClientSecure>client(new BearSSL::WiFiClientSecure);
+      client->setInsecure();
+  
+      HTTPClient https;
+      https.setReuse(true);
+      https.setTimeout(6000);
+      https.setFollowRedirects(HTTPC_STRICT_FOLLOW_REDIRECTS);
 
-    // Establish connection
-    if (!tcpClient.connect(hostChr, port))
-    {
-      sendResult(R_NOCARRIER);
-      connectTime = 0;
-      callConnected = false;
-      setCarrier(callConnected);
+      // HTTPS connection
+      if (https.begin(*client, cmd.substring(addressIndex, cmd.length()))) {  
+    
+        // start connection and send HTTP header
+        int httpCode = https.GET();
+    
+        // httpCode will be negative on error
+        if (httpCode > 0) {
+    
+          
+          // Path found at server or there was a redirect:
+          if (httpCode == HTTP_CODE_OK) {
+            sendString(https.getString());
+          }
+          else  {
+    
+              sendString("HTTP STATUS: ");
+              sendString(String(httpCode));
+              //sendString(https.headers());
+    
+          }
+    
+        } else {
+          sendString("Failed with error: %s\n");
+          sendString(https.errorToString(httpCode));
+        }
+    
+        https.end();  
+      } else {
+        sendString("HTTPS unable to connect.");
+      }
     }
-    else
-    {
-      sendResult(R_CONNECT);
-      connectTime = millis();
-      cmdMode = false;
-      callConnected = true;
-      setCarrier(callConnected);
+    else if (protocolType == ':') {
+      // From the URL, aquire required variables
+      // (12 = "ATGEThttp://")
+      int portIndex = cmd.indexOf(":", 12); // Index where port number might begin
+      int pathIndex = cmd.indexOf("/", 12); // Index first host name and possible port ends and path begins
+      int port;
+      String path, host;
+      if (pathIndex < 0)
+      {
+        pathIndex = cmd.length();
+      }
+      if (portIndex < 0)
+      {
+        port = 80;
+        portIndex = pathIndex;
+      }
+      else
+      {
+        port = cmd.substring(portIndex + 1, pathIndex).toInt();
+      }
+      host = cmd.substring(12, portIndex);
+      path = cmd.substring(pathIndex, cmd.length());
+      if (path == "") path = "/";
+      char *hostChr = new char[host.length() + 1];
+      host.toCharArray(hostChr, host.length() + 1);
 
-      // Send a HTTP request before continuing the connection as usual
-      String request = "GET ";
-      request += path;
-      request += " HTTP/1.1\r\nHost: ";
-      request += host;
-      request += "\r\nConnection: close\r\n\r\n";
-      tcpClient.print(request);
+      // Establish connection
+      if (!tcpClient.connect(hostChr, port))
+      {
+        sendResult(R_NOCARRIER);
+        connectTime = 0;
+        callConnected = false;
+        setCarrier(callConnected);
+      }
+      else
+      {
+        sendResult(R_CONNECT);
+        connectTime = millis();
+        cmdMode = false;
+        callConnected = true;
+        setCarrier(callConnected);
+
+        // Send a HTTP request before continuing the connection as usual
+        String request = "GET ";
+        request += path;
+        request += " HTTP/1.1\r\nHost: ";
+        request += host;
+        request += "\r\nConnection: close\r\n\r\n";
+        tcpClient.print(request);
+      }
+      delete hostChr;
     }
-    delete hostChr;
+    else {
+      sendString("Unknown protocol");
+    }
   }
 
   /**** Unknown command ****/
-  else sendResult(R_ERROR);
+  else {
+    sendResult(R_ERROR);
+  }
 
   cmd = "";
 }
