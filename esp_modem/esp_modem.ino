@@ -1205,7 +1205,7 @@ void command()
     sendResult(R_OK);
   }
 
-  /**** HTTP GET request ****/
+  /**** HTTP/S GET request ****/
   else if (upCmd.indexOf("ATGET") == 0)
   {
     const char protocolType = upCmd[9];
@@ -1241,11 +1241,10 @@ void command()
               sendString("HTTP STATUS: ");
               sendString(String(httpCode));
               //sendString(https.headers());
-    
           }
     
         } else {
-          sendString("Failed with error: %s\n");
+          sendString("Failed with error:\n");
           sendString(https.errorToString(httpCode));
         }
     
@@ -1310,6 +1309,11 @@ void command()
       sendString("Unknown protocol");
     }
   }
+  /**** HTTP POST request ****/
+  else if (upCmd.indexOf("ATPOST") == 0) {
+    sendResult("POST not implemented")
+  }
+
 
   /**** Unknown command ****/
   else {
