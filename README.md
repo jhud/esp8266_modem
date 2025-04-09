@@ -1,7 +1,7 @@
 Virtual modem for ESP8266
 =========================
 
-Added HTTPS support - otherwise left everything how it was.
+Added HTTPS support and ATSCAN wifi scanning - otherwise left everything how it was.
 Copyright (C) 2025 James Hudson <james@disconnectionist.com> under GPLv3 license.
 
 
@@ -38,12 +38,21 @@ Additionally, one wire jumper on the ESP8266 shield:
 
 Slide the UART switch to "HW".
 
+Designing your own board
+------------------------
+
+This is a fun, easy project to build, using not many extra parts beyond an ESP module. Only the LED_PIN and GPIO0 switch need to be accessible to use the modem._
+Note that the LED_PIN LED must have one lead to VCC, so that a logic 0 is on.
+Firmware can be flashed as usual by holding the GPIO0/reset baud button and doing it through the RS232 port with the appropriate cable
+
+
 AT command examples
 -------------------
 
 * Change baud rate: AT$SB=N (N=300,1200,2400,4800,9600,19200,38400,57600,115200)
 * Set WiFi SSID: AT$SSID=YourWiFiSSID
 * Set WiFi Password: AT$PASS=YourWiFiPassword
+* ATSCAN: scan for wifi networks
 * Connect to WiFi: ATC1
 * Save current settigns to NVRAM: AT&W
 * Connect by TCP: ATDTsome.bbs.com:23

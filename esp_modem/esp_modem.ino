@@ -24,6 +24,9 @@
 
    You should have received a copy of the GNU General Public License
    along with this program.  If not, see <http://www.gnu.org/licenses/>.
+
+   NOTES ON HARDWARE
+   The LED_PIN LED should be connected to vcc so an ON is "LED off".
 */
 
 #include <ESP8266WiFi.h>
@@ -115,7 +118,7 @@ static unsigned char ascToPetTable[256] = {
 #define CTS_PIN 12         // CTS Clear to Send, connect to host's RTS pin
 
 // Global variables
-String build = "20160621182048";
+String build = "20160621182049";
 String cmd = "";           // Gather a new AT command to this string from serial
 bool cmdMode = true;       // Are we in AT command mode or connected mode
 bool callConnected = false;// Are we currently in a call
@@ -166,6 +169,37 @@ WiFiClient tcpClient;
 WiFiServer tcpServer(tcpServerPort);
 ESP8266WebServer webServer(80);
 MDNSResponder mdns;
+
+/*
+ * Written by Ahmad Shamshiri
+  * with lots of research, this sources was used:
+ * https://support.randomsolutions.nl/827069-Best-dBm-Values-for-Wifi 
+ * This is approximate percentage calculation of RSSI
+ * Wifi Signal Strength Calculation
+ * Written Aug 08, 2019 at 21:45 in Ajax, Ontario, Canada
+ */
+
+const int RSSI_MAX =-50;// define maximum straighten of signal in dBm
+const int RSSI_MIN =-100;// define minimum strength of signal in dBm
+
+int dBmtoPercentage(int dBm)
+{
+  int quality;
+    if(dBm <= RSSI_MIN)
+    {
+        quality = 0;
+    }
+    else if(dBm >= RSSI_MAX)
+    {  
+        quality = 100;
+    }
+    else
+    {
+        quality = 2 * (dBm + 100);
+   }
+
+     return quality;
+}//dBmtoPercentage 
 
 String connectTimeString() {
   unsigned long now = millis();
@@ -245,14 +279,17 @@ void defaultEEPROM() {
   EEPROM.write(FLOW_CONTROL_ADDRESS, 0x00);
   EEPROM.write(PIN_POLARITY_ADDRESS, 0x01);
 
-  setEEPROM("bbs.fozztexx.com:23", speedDialAddresses[0], 50);
-  setEEPROM("cottonwoodbbs.dyndns.org:6502", speedDialAddresses[1], 50);
-  setEEPROM("borderlinebbs.dyndns.org:6400", speedDialAddresses[2], 50);
-  setEEPROM("particlesbbs.dyndns.org:6400", speedDialAddresses[3], 50);
-  setEEPROM("reflections.servebbs.com:23", speedDialAddresses[4], 50);
-  setEEPROM("heatwavebbs.com:9640", speedDialAddresses[5], 50);
-
-  for (int i = 5; i < 10; i++) {
+  int addressIndex = 0;
+  setEEPROM("bbs.fozztexx.com:23", speedDialAddresses[addressIndex++], 50);
+  setEEPROM("cottonwoodbbs.dyndns.org:6502", speedDialAddresses[addressIndex++], 50);
+  setEEPROM("borderlinebbs.dyndns.org:6400", speedDialAddresses[addressIndex++], 50);
+  setEEPROM("particlesbbs.dyndns.org:6400", speedDialAddresses[addressIndex++], 50);
+  setEEPROM("reflections.servebbs.com:23", speedDialAddresses[addressIndex++], 50);
+  setEEPROM("heatwavebbs.com:9640", speedDialAddresses[addressIndex++], 50);
+  setEEPROM("20forbeers.com:1337", speedDialAddresses[addressIndex++], 50);
+  setEEPROM("bbs.retrocampus.com:23", speedDialAddresses[addressIndex++], 50);
+  
+  for (int i = addressIndex; i < 10; i++) {
     setEEPROM("", speedDialAddresses[i], 50);
   }
 
@@ -355,7 +392,7 @@ void connectWiFi() {
   }
   Serial.println();
   if (i == 21) {
-    Serial.print("COULD NOT CONNET TO "); Serial.println(ssid);
+    Serial.print("COULD NOT CONNECT TO "); Serial.println(ssid);
     WiFi.disconnect();
     updateLed();
   } else {
@@ -414,6 +451,34 @@ void setBaudRate(int inSpeed) {
 void setCarrier(byte carrier) {
   if (pinPolarity == P_NORMAL) carrier = !carrier;
   digitalWrite(DCD_PIN, carrier);
+}
+
+void sendScanWifi() {
+    Serial.println("SEARCHING WIFI ACCESS POINTS...");
+    int n = WiFi.scanNetworks();
+      if (n == 0) {
+    Serial.println("NONE FOUND");
+  } else {
+    for (int i = 0; i < n; ++i) {
+      // Print SSID and RSSI for each network found
+      Serial.print(i + 1);
+      Serial.print(". ");
+      Serial.print(WiFi.SSID(i));
+      Serial.print(" ");
+      Serial.print(WiFi.RSSI(i));
+      Serial.print("dBm (");
+      Serial.print(dBmtoPercentage(WiFi.RSSI(i)));
+      Serial.print("%)"); 
+      if(WiFi.encryptionType(i) == ENC_TYPE_NONE)
+      {
+          Serial.println(" <UNSECURED>");        
+      }else{
+          Serial.println();        
+      }
+      delay(10);
+    }
+  }
+  WiFi.scanDelete();  
 }
 
 void displayNetworkStatus() {
@@ -584,6 +649,7 @@ void displayHelp() {
   waitForSpace();
   Serial.println("FLOW CONTROL..: AT&KN (N=0/N,1/HW,2/SW)"); yield();
   Serial.println("WIFI OFF/ON...: ATC0 / ATC1"); yield();
+  Serial.println("WIFI AP SCAN..: ATSCAN"); yield();
   Serial.println("HANGUP........: ATH"); yield();
   Serial.println("ENTER CMD MODE: +++"); yield();
   Serial.println("EXIT CMD MODE.: ATO"); yield();
@@ -1311,9 +1377,14 @@ void command()
   }
   /**** HTTP POST request ****/
   else if (upCmd.indexOf("ATPOST") == 0) {
-    sendResult("POST not implemented")
+    sendString("POST not implemented");
   }
 
+  /**** wifi scan ****/
+  else if (upCmd.indexOf("ATSCAN") == 0) {
+    sendScanWifi();
+    sendResult(R_OK);
+  }
 
   /**** Unknown command ****/
   else {
