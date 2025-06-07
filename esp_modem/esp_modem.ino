@@ -27,6 +27,9 @@
 
    NOTES ON HARDWARE
    The LED_PIN LED should be connected to vcc so an ON is "LED off".
+
+   TROUBLESHOOTING
+   Turn off debugging output, or low speeds, ie 300baud will trigger the watchdog timer.
 */
 
 #include <ESP8266WiFi.h>
@@ -665,7 +668,6 @@ void storeSpeedDial(byte num, String location) {
 void welcome() {
   Serial.println();
   Serial.println("WIFI SIXFOUR BUILD " + build + " BY @PAULRICKARDS");
-  Serial.println("BASED ON GITHUB.COM/JSALIN/ESP8266_MODEM");
 }
 
 /**
@@ -946,11 +948,34 @@ void dialOut(String upCmd) {
 */
 void command()
 {
-  cmd.trim();
-  if (cmd == "") return;
   Serial.println();
   String upCmd = cmd;
   upCmd.toUpperCase();
+
+  // we strip out C and BASIC comments, so we can embed modem commands in pocket computer BASIC and C programs.
+  while(isDigit(upCmd[0]) || upCmd[0] == ' ') {
+    // Remove line numbers from command if this is a BASIC script being interpreted as a command.
+    upCmd.remove(0,1);
+  }
+
+  if (upCmd.indexOf("/*") == 0) {
+    // Remove C comments
+    upCmd.remove(0,2);
+  }
+
+  int endDelimiter = upCmd.indexOf("*/");
+  if (endDelimiter >= 0) {
+    upCmd.remove(endDelimiter,2);
+  }
+
+  if (upCmd.indexOf("REM ") == 0) {
+    // Remove BASIC comments
+    upCmd.remove(0,4);
+  }
+
+  upCmd.trim();
+  if (upCmd == "") return;
+
 
   /**** Just AT ****/
   if (upCmd == "AT") sendResult(R_OK);
